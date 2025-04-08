@@ -62,7 +62,7 @@ f_ks <- function(Y, S) {
 }
 
 
-# Note that the training and test data should have been rearranged according to sensitive variable, respectively, before using this Ifair and Pfair.
+# Note that the training and test data should have been rearranged according to sensitive variable, respectively, before using this Ifairpoi, Ifairqua and Pfair.
 # Here, we require that the input vectors Strain and Stest are sorted in increasing order (e.g., c(0, 0, 1, 1, 1)).
 Ifairpoi = function(fLYpredictions, fTYpredictions, fStrain, fStest, fYtrain){
   
