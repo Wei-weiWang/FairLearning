@@ -24,6 +24,7 @@ cols[c(iA, iB, iC, iD)] <- cols[c(iB, iA, iD, iC)]
 # reindex the df
 hrs <- hrs[ , cols]
 
+
 set.seed(50)
 # Pre-allocate result vectors (30 iterations)
 n_iter <- 30
@@ -42,6 +43,7 @@ PRPA_KS_T <- numeric(n_iter)
 PRPA_PL_L <- numeric(n_iter)
 PRPA_KS_L <- numeric(n_iter)
 
+
 sample_size <- floor(0.8 * nrow(hrs))  # 80% training, 20% test
 
 for (k in 1:n_iter) {
@@ -55,21 +57,27 @@ for (k in 1:n_iter) {
   idx_y = 26
   idx_sensi = 27
   
+  
   #--------------------------
   # Plain Poisson Regression
   #--------------------------
   
   poisson_model <- glm(hrs$score[train_indices] ~ ., data =  hrs[train_indices, c(-idx_y)], family = poisson())
   
+  
   PR_PL_L[k] = poissonloss(hrs$score[train_indices], poisson_model$fitted.values  )
   PR_KS_L[k] = f_ks(poisson_model$fitted.values, hrs[train_indices, idx_sensi])
+  
   
   predicted_y <- predict(poisson_model, newdata =  hrs[-train_indices, c(-idx_y)], type = 'response')
   PR_PL_T[k] = poissonloss(hrs$score[-train_indices], predicted_y )
   PR_KS_T[k] =  f_ks(predicted_y, hrs[-train_indices, idx_sensi])
   
+  
+  
   # Fair regression methods
   split_by_gender_train <- split(train_data, train_data[,idx_sensi])
+  
   split_by_gender_test <- split(test_data, test_data[,idx_sensi])
   
   # For train
@@ -110,6 +118,7 @@ for (k in 1:n_iter) {
     rankYTF_split = sapply(TYpred_split, function(y) sum(LYpred_split <= y)/length(LYpred_split))
     rankYTF = c(rankYTF, rankYTF_split)
     
+    
   }
   names(rankYLF) <- NULL
   
@@ -117,17 +126,18 @@ for (k in 1:n_iter) {
   # Ispline Method
   #--------------------------
   
+  
   # Fit the Ispline model on training data
   ispline_fit <- fit_ispline_model_Poisson(rankYLF, Ytrain, 
-                                   knots = c(0.2, 0.5, 0.75), degree = 2)  
+                                   knots = c(0.25, 0.5, 0.75), degree = 2)  
   train_pred <- ispline_predict(rankYLF, ispline_fit$coeff, 
-                                knots = c(0.2, 0.5, 0.75), degree = 2)  
+                                knots = c(0.25, 0.5, 0.75), degree = 2)  
   PRI_PL_L[k] <- poissonloss(Ytrain, exp(train_pred)) 
   PRI_KS_L[k] <- f_ks(train_pred, Strain) 
-
-                           
+  
+  
   test_pred <- ispline_predict(rankYTF, ispline_fit$coeff, 
-                               knots = c(0.2, 0.5, 0.75), degree = 2)
+                               knots = c(0.25, 0.5, 0.75), degree = 2)
   PRI_PL_T[k] <- poissonloss(Ytest, exp(test_pred))
   PRI_KS_T[k] <- f_ks(test_pred, Stest) 
   
