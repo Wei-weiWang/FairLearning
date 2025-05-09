@@ -1,4 +1,8 @@
-setwd('D:/dataoffairregress')
+library(splines2)  
+library(dfoptim)
+library(Iso)   
+library(isotone)
+library(rqPen) 
 
 # Crime dataset 
 community = read.csv('./community.csv')
@@ -6,24 +10,9 @@ community = read.csv('./community.csv')
 # Check NA in community
 any(is.na(community)) # No NA
 
-# Check unique numbers in each column
-unique_counts <- sapply(community, function(col) length(unique(col)))
-sort(unique_counts) #MedNumBR(median number of bedrooms) 3 #race 4 #NumImmig 47... 
-
-
-set.seed(30)
-library(quantreg)
-library(splines2)  
-library(Iso)       
-library(rqPen) 
-
-
-
-#------------------------------------
-# Main Loop with Optimized Workflow
-#------------------------------------
 
 # Pre-allocate result vectors (30 iterations)
+set.seed(50)
 n_iter <- 30
 QR_Pinball_T <- numeric(n_iter)
 QR_KS_T      <- numeric(n_iter)
@@ -48,6 +37,10 @@ for (k in 1:n_iter) {
   
   # Create train/test split
   train_indices <- sample(seq_len(nrow(community)), size = sample_size)
+  write.table(community[train_indices,], "crimetrain75.csv", sep = ",", 
+              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
+  write.table(community[-train_indices,], "crimetest75.csv", sep = ",", 
+              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
   
   train_data <- community[train_indices, ]
   test_data  <- community[-train_indices, ] 
@@ -111,36 +104,30 @@ for (k in 1:n_iter) {
     }
     else{
       
-      #cvfit <- rq.pen.cv(
-      #  x        = as.matrix(train_cov_split),
-      #  y        = Ytrain_split[[1]],
-      #  tau      = qu,
-      #  penalty  = "Ridge",
-      #  lambda   = NULL,
-      #  eps = 0.0001,
-      #  nlambda = 500,
-      #  nfold = 1
-      #)
-      
-      #best_lambda <- cvfit$btr[[3]]
+      #community$pctUrban[which(community$race==3)] which is a column basically with no extra information
+      #[1] 1 1 0 1 1 1 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+      #[55] 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+      if(i==3){
+        train_cov_split$pctUrban = NULL
+        test_cov_split$pctUrban = NULL
+      }
       
       rqmodel = rq.pen(x        = as.matrix(train_cov_split),
                      y        = Ytrain_split[[1]],
                      tau      = qu, 
-                     penalty  = "Ridge",
-                     eps = 0.0001
+                     penalty  = "LASSO",
+                     eps = 0.0001,
+                     nlambda = 200
                      ) #A rq.pen.seq object
       
-      qicre = qic.select(rqmodel, method="AIC") #Choose  lambda and coefficients
+      qicre = qic.select(rqmodel, method="BIC") #Choose  lambda and coefficients
       #coefficients(model, lambda=best_lambda)
+      print(qicre$modelsInfo)
       
       LYpred_split = as.matrix( cbind(1, train_cov_split) )%*%qicre$coefficients
       #LYpred_split = as.matrix( cbind(1, train_cov_split) )%*%qicre$coefficients
       TYpred_split = as.matrix( cbind(1, test_cov_split) )%*%qicre$coefficients
       }
-    
-    #print( quantile_loss( split_by_race_train[[i]][idx_y][[1]], LYpred_split, 0.75)  )
-    #print( quantile_loss( split_by_race_test[[i]][idx_y][[1]], TYpred_split, 0.75)  )
     
     LYpred = c(LYpred, LYpred_split)
     
@@ -160,23 +147,23 @@ for (k in 1:n_iter) {
 
   
   # Fit the Ispline model on training data
-  ispline_fit <- fit_ispline_model(rankYLF, Ytrain, tau = qu, 
-                                   knots = c(0.2, 0.5, 0.75), degree = 2)  
+  ispline_fit <- fit_ispline_model_Quantile(rankYLF, Ytrain, tau = qu, 
+                                   knots = c(0.25, 0.5, 0.75), degree = 2)  
   train_pred <- ispline_predict(rankYLF, ispline_fit$coeff, 
-                                knots = c(0.2, 0.5, 0.75), degree = 2)  
+                                knots = c(0.25, 0.5, 0.75), degree = 2)  
   QRI_Pinball_L[k] <- quantile_loss(Ytrain, train_pred, qu) 
   QRI_KS_L[k] <- f_ks(train_pred, Strain) 
   
 
   test_pred <- ispline_predict(rankYTF, ispline_fit$coeff, 
-                               knots = c(0.2, 0.5, 0.75), degree = 2)
+                               knots = c(0.25, 0.5, 0.75), degree = 2)
   QRI_Pinball_T[k] <- quantile_loss(Ytest, test_pred, qu)
   QRI_KS_T[k] <- f_ks(test_pred, Stest) 
   
   #--------------------------
   # PAVA Method
   #--------------------------
-  pava_fit <- fit_pava_model(rankYLF, Ytrain, tau = qu, solverinput = weighted.fractile ) 
+  pava_fit <- fit_pava_model_Quantile(rankYLF, Ytrain, tau = qu, solverinput = weighted.fractile ) 
   gpava_pred_train <- gpava(rankYLF, Ytrain, solver = weighted.fractile, 
                             ties = "secondary", p = qu)$x 
   QRPA_Pinball_L[k] <- quantile_loss(Ytrain, gpava_pred_train, qu) 
