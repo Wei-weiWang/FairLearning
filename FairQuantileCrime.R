@@ -37,10 +37,6 @@ for (k in 1:n_iter) {
   
   # Create train/test split
   train_indices <- sample(seq_len(nrow(community)), size = sample_size)
-  write.table(community[train_indices,], "crimetrain75.csv", sep = ",", 
-              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
-  write.table(community[-train_indices,], "crimetest75.csv", sep = ",", 
-              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
   
   train_data <- community[train_indices, ]
   test_data  <- community[-train_indices, ] 
