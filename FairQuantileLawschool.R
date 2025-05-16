@@ -46,10 +46,6 @@ for (k in 1:n_iter) {
   
   # Create train/test split
   train_indices <- sample(seq_len(nrow(lawschool)), size = sample_size)
-  write.table(lawschool[train_indices,], "lawtrain75.csv", sep = ",", 
-              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
-  write.table(lawschool[-train_indices,], "lawtest75.csv", sep = ",", 
-              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
   
   train_data <- lawschool[train_indices, ]
   test_data  <- lawschool[-train_indices, ] 
@@ -73,8 +69,6 @@ for (k in 1:n_iter) {
   predicted_y <- predict(quantile_model, newdata = lawschool[-train_indices, c(1:idx_cov, idx_race)])
   QR_Pinball_T[k] <- quantile_loss(lawschool[-train_indices, idx_y], predicted_y, qu) 
   QR_KS_T[k] <- f_ks(predicted_y, lawschool[-train_indices, idx_race])
-  
-  
   
   # Fair regression methods
   split_by_race_train <- split(train_data, train_data[,idx_race])
