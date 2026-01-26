@@ -1,9 +1,23 @@
+library(quantreg)
+library(splines2)  
+library(dfoptim)
+library(Iso)   
+library(isotone)
+library(rqPen) 
+
+
+MSE<- function(YT, YF) {
+  err <- sum((YT - YF)^2)/length(YT)
+  return(err)
+}
+
 quantile_loss <- function(y, y_hat, tau) {
   loss <- ifelse(y < y_hat, (tau - 1) * (y - y_hat), tau * (y - y_hat))
   mean(loss)
 }
 
 
+# KS statistic
 f_ks <- function(Y, S) {
   ts <- sort(unique(Y))
   
@@ -20,11 +34,11 @@ f_ks <- function(Y, S) {
       class_i <- classes[i]
       class_j <- classes[j]
       
-      # Get the counts for each class
+
       nn_i <- sum(S == class_i)
       nn_j <- sum(S == class_j)
       
-      # Compute KS statistic for this pair of classes
+
       fai <- 0
       for (t in ts) {
         tmp1 <- sum(Y[S == class_i] <= t) / nn_i
@@ -52,14 +66,35 @@ poissonloss = function( Y, expfhat  ){
   ans = expfhat - Y* log(expfhat)
   return( mean (ans) ) 
   
+} 
+
+huber_loss <- function(r, delta) {ifelse(abs(r) <= delta,
+                                        0.5 * r^2,
+                                        delta * abs(r) - 0.5 * delta^2)}
+
+huber_psi <- function(r, delta) pmax(pmin(r, delta), -delta)  # derivative
+
+huber_fit_delta <- function(y, X, delta, intercept = TRUE) {
+  X <- as.matrix(X)
+  if (intercept && (ncol(X) == 0 || any(X[,1] != 1))) X <- cbind(1, X)
+  p <- ncol(X)
+  
+  obj <- function(b) sum(huber_loss(y - drop(X %*% b), delta))
+  grad <- function(b) {
+    r <- y - drop(X %*% b)
+    - crossprod(X, huber_psi(r, delta))
+  }
+  
+  b0 <- rep(0, p)                   
+  sol <- optim(b0, obj, grad, method = "BFGS", control = list(reltol = 1e-10))
+  list(coef = sol$par, convergence = sol$convergence)
 }
 
-#------------------------------------
-# ISPLINE METHOD FUNCTIONS
-#------------------------------------
+
+# I-spline METHOD FUNCTIONS
 
 fit_ispline_model_Quantile <- function(rank_train, Y_train, tau = 0.75, 
-                              knots = c(0.25, 0.5, 0.75),  degree = 2) {
+                                       knots = c(0.25, 0.5, 0.75),  degree = 2) {
   is_basis <- iSpline(rank_train, knots = knots, Boundary.knots = c(0,1),  degree = degree) # Generate iSpline 
   
   quantile_loss_objective <- function(par) {
@@ -73,7 +108,7 @@ fit_ispline_model_Quantile <- function(rank_train, Y_train, tau = 0.75,
 }
 
 fit_ispline_model_Poisson <- function(rank_train, Y_train,
-                              knots = c(0.25, 0.5, 0.75),  degree = 2) {
+                                      knots = c(0.25, 0.5, 0.75),  degree = 2) {
   
   is_basis <- iSpline(rank_train, knots = knots, Boundary.knots = c(0,1),  degree = degree) # Generate iSpline 
   
@@ -90,17 +125,55 @@ fit_ispline_model_Poisson <- function(rank_train, Y_train,
   list(coeff = optim_result$par)
 }
 
-
-ispline_predict <- function(rank_new, coeff, 
-                            knots = c(0.25, 0.5, 0.75), degree = 2) {
-  new_basis <- iSpline(rank_new, knots = knots,  Boundary.knots = c(0,1), degree = degree)
-  as.vector(cbind(new_basis, 1) %*% coeff) # To do the prediction
+fit_ispline_model_Linear <- function(rank_train, Y_train,
+                                     knots = c(0.25, 0.5, 0.75),  degree = 2) {
+  
+  is_basis <- iSpline(rank_train, knots = knots, Boundary.knots = c(0,1),  degree = degree) # Generate iSpline 
+  
+  linear_loss_tie <- function(par) {
+    column_of_ones <- rep(1, nrow(is_basis))
+    y_pred = cbind(is_basis, column_of_ones)%*%par
+    return( MSE(Y_train, y_pred) )
+    
+    
+  }
+  initial_par <- rep(1, ncol(is_basis) + 1) # Initialize parameter
+  optim_result <- hjkb(initial_par, linear_loss_tie, 
+                       lower = c(rep(0, ncol(is_basis)), -Inf))# Update the parameter to get the best one
+  list(coeff = optim_result$par)
 }
 
 
-#------------------------------------
+
+fit_ispline_model_Robust <- function(rank_train, Y_train,
+                                     knots = c(0.25, 0.5, 0.75),  degree = 2, delta) {
+  
+  is_basis <- iSpline(rank_train, knots = knots, Boundary.knots = c(0,1),  degree = degree) # Generate iSpline 
+  
+  huber_loss_tie <- function(par) {
+    column_of_ones <- rep(1, nrow(is_basis))
+    y_pred = cbind(is_basis, column_of_ones)%*%par
+    return( sum(huber_loss(Y_train-y_pred, delta)) )
+    
+    
+  }
+  initial_par <- rep(1, ncol(is_basis) + 1) # Initialize parameter
+  optim_result <- hjkb(initial_par, huber_loss_tie, 
+                       lower = c(rep(0, ncol(is_basis)), -Inf))# Update the parameter to get the best one
+  list(coeff = optim_result$par)
+}
+
+
+
+# Given a vector of ranks, predict responses using the fitted Ispline model.
+ispline_predict <- function(rank_new, coeff, 
+                            knots = c(0.25, 0.5, 0.75), degree = 2) {
+  new_basis <- iSpline(rank_new, knots = knots,  Boundary.knots = c(0,1), degree = degree)
+  as.vector(cbind(new_basis, 1) %*% coeff) 
+}
+
+
 # PAVA METHOD FUNCTIONS
-#------------------------------------
 
 fit_pava_model_Quantile <- function(rank_train, Y_train, tau = NA, solverinput = weighted.fractile) {
   gpava_result <- gpava(rank_train, Y_train, 
@@ -117,7 +190,7 @@ fit_pava_model_Quantile <- function(rank_train, Y_train, tau = NA, solverinput =
   rank_unique <- rank_unique[ord]
   gpava_unique <- gpava_unique[ord]
   
-
+  
   # Determine knot positions: indices where the fitted values change
   knots_idx <- which(diff(gpava_unique) != 0) + 1
   y0 <- c(gpava_unique[1], gpava_unique[knots_idx])
@@ -149,6 +222,60 @@ fit_pava_model_Poisson <- function(rank_train, Y_train, solverinput = poisson_so
     gpava_unique[1] = unique(gpava_unique)[2]
     
   }
+  y0 <- c(gpava_unique[1], gpava_unique[knots_idx])
+  # Build a step function; here we use the index positions as knots.
+  model_fun <- stepfun(knots_idx, y0)
+  list(rank_unique = rank_unique, model = model_fun)
+}
+
+
+
+fit_pava_model_Linear <- function(rank_train, Y_train, solverinput = weighted.mean) {
+  gpava_result <- gpava(rank_train, Y_train, 
+                        solver = solverinput, ties = "secondary")
+  fitted_values <- gpava_result$x
+  
+  # Remove duplicates based on training ranks
+  unique_idx <- !duplicated(rank_train)
+  rank_unique <- rank_train[unique_idx]
+  gpava_unique <- fitted_values[unique_idx]
+  
+  # Order the unique values
+  ord <- order(rank_unique)
+  rank_unique <- rank_unique[ord]
+  gpava_unique <- gpava_unique[ord]
+  
+  
+  # Determine knot positions: indices where the fitted values change
+  knots_idx <- which(diff(gpava_unique) != 0) + 1
+  y0 <- c(gpava_unique[1], gpava_unique[knots_idx])
+  # Build a step function; here we use the index positions as knots.
+  model_fun <- stepfun(knots_idx, y0)
+  list(rank_unique = rank_unique, model = model_fun)
+}
+
+
+L_obj <- function(m, y, w, M) sum(w * huber_loss(y - m, M))
+
+
+fit_pava_model_Robust <- function(rank_train, Y_train, solverinput = huber_solver) {
+  gpava_result <- gpava(rank_train, Y_train, 
+                        solver = solverinput, ties = "secondary")
+  fitted_values <- gpava_result$x
+  
+  # Remove duplicates based on training ranks
+  unique_idx <- !duplicated(rank_train)
+  rank_unique <- rank_train[unique_idx]
+  gpava_unique <- fitted_values[unique_idx]
+  
+  # Order the unique values
+  ord <- order(rank_unique)
+  rank_unique <- rank_unique[ord]
+  gpava_unique <- gpava_unique[ord]
+  
+  
+  # Determine knot positions: indices where the fitted values change
+  knots_idx <- which(diff(gpava_unique) != 0) + 1
   y0 <- c(gpava_unique[1], gpava_unique[knots_idx])
   # Build a step function; here we use the index positions as knots.
   model_fun <- stepfun(knots_idx, y0)
