@@ -1,3 +1,10 @@
+library(quantreg)
+library(splines2)  
+library(dfoptim)
+library(Iso)   
+library(isotone)
+library(rqPen) 
+
 set.seed(50)
 n_iter <- 100
 QR_Pinball_T <- numeric(n_iter)
@@ -290,5 +297,6 @@ cat("QRPA_Pinball_T:", sd(QRPA_Pinball_T)/sqrt(n_iter), "\n")
 cat("QRPA_KS_T:", sd(QRPA_KS_T)/sqrt(n_iter), "\n")
 cat("QRPA_Pinball_L:", sd(QRPA_Pinball_L)/sqrt(n_iter), "\n")
 cat("QRPA_KS_L:", sd(QRPA_KS_L)/sqrt(n_iter), "\n")
+
 
 
