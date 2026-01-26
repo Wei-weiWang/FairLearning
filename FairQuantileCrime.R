@@ -24,22 +24,6 @@ QRPA_KS_L      <- numeric(n_iter)
 
 qu <- 0.25
 
-
-#sample_size <- floor(0.8 * nrow(community))  # 80% training, 20% test
-
-
-# Get data from community dataset for 100 repetitions
-
-#for (k in 1:100) {
-
-  # Create train/test split
-#  train_indices <- sample(seq_len(nrow(community)), size = sample_size)
-#  write.table(community[train_indices,], "100crimetrain75.csv", sep = ",", 
-#              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
-#  write.table(community[-train_indices,], "100crimetest75.csv", sep = ",", 
-#              row.names = FALSE, col.names = TRUE, quote = FALSE, append = TRUE)
-#}
-
 read_appended_csv <- function(path) {
   lines <- readLines(path)
   header <- lines[1]
@@ -58,8 +42,6 @@ n_test_each  <- nrow(test_all)  / n_iter
 # split into a list of 100 data frames
 train_list <- split(train_all, rep(seq_len(n_iter), each = n_train_each))
 test_list  <- split(test_all,  rep(seq_len(n_iter), each = n_test_each))
-
-
 
 
 for (k in 1:n_iter) {
@@ -91,9 +73,7 @@ for (k in 1:n_iter) {
   QR_Pinball_T[k] <- quantile_loss(test_data[, idx_y], predicted_y, qu) 
   QR_KS_T[k] <- f_ks(predicted_y, test_data[, idx_race])
   
-  
  
-  
   train_fit = cbind(train_data, yfit = quantile_model$fitted.values)
   test_fit = cbind(test_data, yfit = predicted_y)
   idx_yfit = ncol(train_fit)
@@ -130,8 +110,6 @@ for (k in 1:n_iter) {
     Ytest = c(Ytest, Ytest_split[[1]])
     Stest = c(Stest, rep(i, nrow(Ytest_split)))
     
-    
-    
     LYpred = c(LYpred, LYpred_split)
     
     rankYLF_split = rank(LYpred_split, ties.method = "max")/length(LYpred_split) 
@@ -141,11 +119,7 @@ for (k in 1:n_iter) {
     rankYTF = c(rankYTF, rankYTF_split)
   }
    
-  
-
   # Ispline Method
-  
-  
   # make knots
   n_interior_vec <- 0:10
   
@@ -235,10 +209,7 @@ for (k in 1:n_iter) {
   best_knots <- knot_list[[ best_row$knots_id ]]
   best_degree <- best_row$degree
   print(best_knots)
-  print(best_degree)
-  
- 
-    
+  print(best_degree) 
   
   # Fit the Ispline model on training data
   ispline_fit <- fit_ispline_model_Quantile(rankYLF, Ytrain, tau = qu, 
@@ -269,7 +240,6 @@ for (k in 1:n_iter) {
 
 
 # Summarize Results
-
 cat("Means:\n")
 cat("QR_Pinball_T:", mean(QR_Pinball_T), "\n")
 cat("QR_KS_T:", mean(QR_KS_T), "\n")
@@ -297,6 +267,7 @@ cat("QRPA_Pinball_T:", sd(QRPA_Pinball_T)/sqrt(n_iter), "\n")
 cat("QRPA_KS_T:", sd(QRPA_KS_T)/sqrt(n_iter), "\n")
 cat("QRPA_Pinball_L:", sd(QRPA_Pinball_L)/sqrt(n_iter), "\n")
 cat("QRPA_KS_L:", sd(QRPA_KS_L)/sqrt(n_iter), "\n")
+
 
 
 
