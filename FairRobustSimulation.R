@@ -27,55 +27,36 @@ RRPA_KS_L <- numeric(n_iter)
 a = 1 
 delta <- 9.67*1.345
 
-
-
-
 for (k in 1:n_iter) {
   cat("Iteration:", k, "\n")
   
-  # Create train/test split
-  
-  ## Y|S=0 ~ 3* N (1, 1) + 4*N (2, sd = 2) + N(0, sd = 1) = N(3+8, 9+64+1)
-  ## Y|S=1 ~ 2* N (-1, 1) + 4* N(2, sd = 2 ) + N(0, sd = 1 ) = N(-2+8, 4+64+1  )
-  
-  # ------------------------------------------------------
-  # Data‐Generating Process:
-  #   X | S = 0 ~ (N(1,1),  N(2,2^2))
-  #   X | S = 1 ~ (N(-1,1), N(2,2^2))
-  #
-  #   Y | S = 0 ~ 3·N(1,1) + 4·N(2,2^2) + N(0,1^2) = N(3+8, 9+64+1)
-  #   Y | S = 1 ~ 2·N(-1,1) + 4·N(2,2^2) + N(0,1^2) =  N(6, 4+64+1)
-  # ------------------------------------------------------
-  
-  # Train
-  # 1. Sample sizes
   n = 500
   S = rbinom(n, size = 1, prob = 0.5)
   n_train1 <- sum(S==0)
   n_train2 <- sum(S==1)
   
-  # 2. Generate features for S = 1
+  # Generate features for one subgroup
   mu = rep(0, 8)
   Sigma <- toeplitz(   0.5^(0:(8-1))  )
   X1 = rmvnorm(n_train1, mu, Sigma)
-  beta1 = c(3, 1.5, 0, 0, 2, 0, 0, 0) # Following another paper
+  beta1 = c(3, 1.5, 0, 0, 2, 0, 0, 0) 
   
-  # 3. Generate outcome for S = 1
+  # Generate outcome for one subgroup
   Y1_clean <- 1 + X1%*%beta1 
   
   z1  <- rbinom(n_train1, 1, 0.9)                  
   esd1 <- ifelse(z1 == 1, 1, 15)
   V1  <- rnorm(n_train1, mean = 0, sd = esd1)
-  sdV <- sqrt(0.9 * 1^2 + 0.1 * 15^2)  # sqrt(Var(V)); here ≈ 4.837
+  sdV <- sqrt(0.9 * 1^2 + 0.1 * 15^2) 
   eps1 <- V1 / sdV
   Y1  <- Y1_clean + 9.67*eps1
   
   
-  # 4. Generate features for S = 2
+  # Generate features for the other subgroup
   X2 = rmvnorm(n_train2, mu, Sigma)
   beta2 = c(3, 1.5, 0, 0, 2, 0, 0, 0)
   
-  # 5. Generate outcome for S = 2
+  # Generate outcome for the other subgroup
   Y2_clean <- 1 + X2%*%beta2 + a
   
   z2  <- rbinom(n_train2, 1, 0.9)                  
@@ -84,28 +65,25 @@ for (k in 1:n_iter) {
   eps2 <- V2 / sdV
   Y2       <- Y2_clean + 9.67*eps2
   
-  # 6. Combine into training vectors
+  # Combine into training vectors
   X <- rbind(X1, X2)      
   Y   <- c(Y1, Y2)       # combined outcome
   S   <- c(rep(0, n_train1),
            rep(1, n_train2))  # sensitive group indicator
   
-  # 7. Build data frames
   train_df   <- data.frame(X = X, Y = Y, S = as.factor(S))
   
   
   
-  # Test
-  
-  # 1. Sample sizes
+  # Generate test data
   n_test1 <- 5000
   n_test2 <- 5000
   
-  # 2. Generate features for S = 1
+  # Generate features for one subgroup
   tX1 = rmvnorm(n_test1, mu, Sigma)
 
   
-  # 3. Generate outcome for S = 1
+  # Generate outcome for one subgroup
   tY1_clean <-  1 + tX1%*%beta1 
   
   
@@ -115,14 +93,11 @@ for (k in 1:n_iter) {
   teps1 <- tV1 / sdV
   tY1  <- tY1_clean + 9.67*teps1
   
-
-  
-  # 4. Generate features for S = 2
+  # Generate features for the other subgroup
   tX2 = rmvnorm(n_test2, mu, Sigma)
   
-  # 5. Generate outcome for S = 2
+  # Generate outcome for the other subgroup
   tY2_clean <-  1 + tX2%*%beta2 + a
-  
   
   tz2  <- rbinom(n_test2, 1, 0.9)                  
   tesd2 <- ifelse(tz2 == 1, 1, 15)
@@ -131,42 +106,19 @@ for (k in 1:n_iter) {
   tY2  <- tY2_clean + 9.67*teps2
   
   
-  # 6. Combine into training vectors
+  # Combine into testing vectors
   tX <- rbind(tX1, tX2)     
   tY   <- c(tY1,  tY2)       # combined outcome
   tS   <- c(rep(0, n_test1),
             rep(1, n_test2))  # sensitive group indicator
   
-  # 7. Build data frames
   test_df   <- data.frame(X = tX, Y = tY, S = as.factor(tS))
   
   idx_cov = 8
   idx_y = 9
   idx_sensi = 10
   
-  # True fair Ytest
-  #fairTY0 = r0*TY0woer + r1*qnorm( pnorm(TY0woer, mean = 11, sd = 74^0.5 ), mean = 5, sd = 74^0.5 )
-  #fairTY1 = r1*TY1woer + r0*qnorm( pnorm(TY1woer, mean = 5, sd = 74^0.5 ), mean = 11,  sd = 74^0.5 )                                                 
-  #fairTY01 = c(fairTY0, fairTY1)
-  #print(f_ks(data.frame(fairTY01) , data.frame(Stest))  )
-  
-  
-  #fairLY0 = r0*LY0woer + r1*qnorm( pnorm(LY0woer, mean = 11, sd = 74^0.5 ), mean = 5, sd = 74^0.5 )
-  #fairLY1 = r1*LY1woer + r0*qnorm( pnorm(LY1woer, mean = 5, sd = 74^0.5 ), mean = 11,  sd = 74^0.5 )                                                 
-  #fairLY01 = c(fairLY0, fairLY1)
-  
-  
-  #LRMSETfairTr[k] = f_err(fairTY01, Ytest)
-  #LRKSTfairTr[k] =  f_ks(fairTY01  ,  Stest   )
-  
-  #LRMSELfairTr[k] = f_err(fairLY01, Ytrain)
-  #LRKSLfairTr[k] =  f_ks(fairLY01  ,  Strain)
-  
-  
-  
-  #--------------------------
   # Plain Robust Regression
-  #--------------------------
   
   Rfit  <- huber_fit_delta(Y, cbind(X, S), delta = delta)
   
@@ -181,15 +133,12 @@ for (k in 1:n_iter) {
   RR_HL_T[k] =  mean(huber_loss(TYpredictions-tY, delta))
   RR_KS_T[k] =  f_ks(TYpredictions,  tS)
   
- 
-
 
   train_fit = cbind(train_df, yfit = LYpredictions)
   test_fit = cbind(test_df, yfit = TYpredictions)
   idx_yfit = ncol(train_fit)
 
-  split_by_sensi_train <- split(train_fit, train_fit[, idx_sensi]) #the list is ordered by the number of race and so corresponding to the testdata set
-
+  split_by_sensi_train <- split(train_fit, train_fit[, idx_sensi])
   split_by_sensi_test <- split(test_fit, test_fit[, idx_sensi])
 
   # For train
@@ -204,7 +153,6 @@ for (k in 1:n_iter) {
   Stest = c()
 
   rankYTF = c()
-
   racenum = c()
 
   for (i in 1:length(unique(train_fit[, idx_sensi])) ) {
@@ -231,18 +179,12 @@ for (k in 1:n_iter) {
   }
   
   
- 
-  
-  
-  
-  #--------------------------
   # Ispline Method
-  #--------------------------
   
-  # make knots
+  # Make knots
   n_interior_vec <- 0:10
   
-  # Helper: build interior knots at equally spaced quantile positions of X
+  # Build interior knots at equally spaced quantile positions of X
   make_knots <- function(n_interior){
     if(n_interior == 0) return(numeric(0))
     probs <- seq(0, 1, length.out = n_interior + 2)[-c(1, n_interior + 2)]
@@ -304,7 +246,6 @@ for (k in 1:n_iter) {
           degree = deg
         )
         
-        # Metrics
         huber_fold[kk] <- mean(huber_loss(Y_va- va_pred, delta) )
         ks_fold[kk]      <- f_ks(va_pred, S_va)
       }
@@ -327,8 +268,6 @@ for (k in 1:n_iter) {
   
   
   cv_results <- cv_results[order(cv_results$mean_huber), ]
-  
-  
   best_row <- cv_results[1, ]
   
   
@@ -355,17 +294,14 @@ for (k in 1:n_iter) {
   RRI_HL_T[k] <- mean(huber_loss(Ytest-test_pred,delta))
   RRI_KS_T[k] <- f_ks(test_pred, Stest) 
   
-  #--------------------------
+
   # PAVA Method
-  #--------------------------
   pava_fit <- fit_pava_model_Robust(rankYLF, Ytrain, solverinput = huber_solver ) 
-  #gpava_pred_train <- gpava(rankYLF, Ytrain, solver = huber_solver, 
-  #                          ties = "secondary")$x 
   gpava_pred_train <- pava_predict(pava_fit, rankYLF) 
   RRPA_HL_L[k] <- mean(huber_loss(Ytrain-gpava_pred_train, delta) ) 
   RRPA_KS_L[k] <- f_ks(gpava_pred_train, Strain)
   
-  # For test predictions, use our wrapper pava_predict:
+  # Test predictions:
   test_pred_pava <- pava_predict(pava_fit, rankYTF) 
   RRPA_HL_T[k] <- mean(huber_loss(Ytest-test_pred_pava, delta)) 
   RRPA_KS_T[k] <- f_ks(test_pred_pava, Stest) 
