@@ -24,17 +24,10 @@ RRPA_HL_L <- numeric(n_iter)
 RRPA_KS_L <- numeric(n_iter)
 
 
-a = 1 # We change a in different settings
-# We will also change distribution of S: balanced and imbalanced case
-# We will change training data size
+a = 1 
 delta <- 9.67*1.345
 
-huber_solver <- function(y, w = NULL, M = delta) {
-  if (is.null(w)) w <- rep(1, length(y))
-  rng <- range(y) + c(-10*M, 10*M)       # wide bracket
-  res <- optimize(L_obj, interval = rng, y = y, w = w, M = M)
-  res$minimum
-}
+
 
 
 for (k in 1:n_iter) {
