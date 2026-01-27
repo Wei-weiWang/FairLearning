@@ -68,6 +68,15 @@ poissonloss = function( Y, expfhat  ){
   
 } 
 
+L_obj <- function(m, y, w, M) sum(w * huber_loss(y - m, M))
+
+huber_solver <- function(y, w = NULL, M = delta) {
+  if (is.null(w)) w <- rep(1, length(y))
+  rng <- range(y) + c(-10*M, 10*M)       # wide bracket
+  res <- optimize(L_obj, interval = rng, y = y, w = w, M = M)
+  res$minimum
+}
+
 huber_loss <- function(r, delta) {ifelse(abs(r) <= delta,
                                         0.5 * r^2,
                                         delta * abs(r) - 0.5 * delta^2)}
@@ -254,10 +263,6 @@ fit_pava_model_Linear <- function(rank_train, Y_train, solverinput = weighted.me
   list(rank_unique = rank_unique, model = model_fun)
 }
 
-
-L_obj <- function(m, y, w, M) sum(w * huber_loss(y - m, M))
-
-
 fit_pava_model_Robust <- function(rank_train, Y_train, solverinput = huber_solver) {
   gpava_result <- gpava(rank_train, Y_train, 
                         solver = solverinput, ties = "secondary")
@@ -290,3 +295,4 @@ pava_predict <- function(pava_model, rank_new) {
     pava_model$model(idx)
   })
 }
+
