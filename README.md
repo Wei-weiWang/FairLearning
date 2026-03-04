@@ -12,9 +12,7 @@ Our key result is a characterization of the fair risk minimizer, which leads to 
 **Step 1.** Fit a base predictor: $\hat f(x,s)$.
 
 **Step 2.** Compute the rank transform $\hat U = \hat F_s(\hat f(x,s))$, then learn a **shared monotone calibration** function $\hat Q$ on $[0,1]$. The final fair predictor is
-\[
- \hat Q\left(\hat F_s(\hat f(x,s))\right).
-\]
+$\hat Q\left(\hat F_s(\hat f(x,s))\right)$.
 
 This enforces demographic parity by construction while optimizing the chosen loss.
 
