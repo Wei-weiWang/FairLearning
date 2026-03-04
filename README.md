@@ -12,9 +12,9 @@ Our key result is a characterization of the fair risk minimizer, which leads to 
 **Step 1.** Fit a base predictor: $\hat f(x,s)$.
 
 **Step 2.** Compute the rank transform $\hat U = \hat F_s(\hat f(x,s))$, then learn a **shared monotone calibration** function $\hat Q$ on $[0,1]$. The final fair predictor is
-$$
-\hat f_{\text{fair}}(x,s)=\hat Q\!\left(\hat F_s(\hat f(x,s))\right).
-$$
+\[
+\hat f_{\text{fair}}(x,s)=\hat Q\left(\hat F_s(\hat f(x,s))\right).
+\]
 
 This enforces demographic parity by construction while optimizing the chosen loss.
 
@@ -36,7 +36,7 @@ We learn a non-decreasing function $\hat Q$ that maps $\hat U$ to predictions, u
 - `fit_pava_model_Robust(rank_train, Y_train, solverinput=huber_solver)`  
   Fit monotone $\hat Q$ under Huber loss via generalized PAVA.
 - `pava_predict(pava_model, rank_new)`  
-  Predict `Qhat(rank_new)` from a fitted PAVA model.
+  Predict $\hat Q$(rank_new) from a fitted PAVA model.
 
 ### Solver B: I-spline (smooth monotone Q)
 - `fit_ispline_model_Quantile_LP(rank_train, Y_train, tau, knots, degree)`  
@@ -46,7 +46,7 @@ We learn a non-decreasing function $\hat Q$ that maps $\hat U$ to predictions, u
 - `fit_ispline_model_Robust_Convex(rank_train, Y_train, knots, degree, delta, solver)`  
    Fit $\hat Q$ under Huber loss with I-spline basis and nonnegative spline coefficients.
 - `ispline_predict(rank_new, coeff, knots, degree)`  
-  Predict `Qhat(rank_new)` given fitted spline coefficients.
+  Predict $\hat Q$ (rank_new) given fitted spline coefficients.
 
 ---
 
